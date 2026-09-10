@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>श्री राधे राधे ज्वेलर्स - Loyalty System</title>
+    <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #d97706; --primary-dark: #b45309; --bg: #fffbeb; --card-bg: #ffffff; --text: #1f2937; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { background: var(--card-bg); width: 100%; max-width: 500px; padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); box-sizing: border-box; }
+        h2 { text-align: center; color: var(--primary-dark); margin-top: 0; margin-bottom: 2px; }
+        .subtitle { text-align: center; font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+        .ticker { background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 600; text-align: center; padding: 6px; border-radius: 6px; margin-bottom: 15px; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 13px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        button { width: 100%; background-color: var(--primary); color: white; border: none; padding: 12px; font-size: 15px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s; margin-top: 8px; }
+        button:hover { background-color: var(--primary-dark); }
+        .btn-secondary { background-color: #6b7280; }
+        .btn-secondary:hover { background-color: #4b5563; }
+        .btn-danger { background-color: #dc2626; }
+        .btn-danger:hover { background-color: #b91c1c; }
+        .btn-success { background-color: #10b981; }
+        .btn-success:hover { background-color: #059669; }
+        .nav-tabs { display: flex; gap: 6px; margin-bottom: 15px; }
+        .nav-tabs button { margin-top: 0; flex: 1; font-size: 12px; padding: 8px 4px; }
+        .info-box { font-size: 13px; color: #4b5563; background: #f3f4f6; padding: 10px; border-radius: 6px; margin-bottom: 15px; line-height: 1.4; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        th, td { border: 1px solid #e5e7eb; padding: 6px; text-align: left; word-break: break-word; }
+        th { background-color: #f9fafb; }
+        .qr-box { display: flex; justify-content: center; margin: 15px 0; }
+        .qr-box div { padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>श्री राधे राधे ज्वेलर्स</h2>
+    <div class="subtitle">Cloud Loyalty Point System</div>
+    
+    <!-- Feature 4: Gold & Silver Rate Ticker -->
+    <div class="ticker" id="metalTicker">🪙 Gold (24K): ₹72,500/10g | Silver: ₹85,000/kg</div>
+
+    <!-- ROLE SELECTOR -->
+    <div id="roleSelectView" class="view-section active">
+        <div class="info-box" style="text-align: center;">Select your portal to continue:</div>
+        <button onclick="showView('customerLoginView')">Customer Portal</button>
+        <button onclick="showView('adminLoginView')" class="btn-secondary">Admin Portal (Shop Owner)</button>
+        
+        <div style="margin-top: 25px; border-top: 1px dashed #d1d5db; padding-top: 15px; text-align: center;">
+            <p style="font-size: 12px; color: #6b7280; margin-bottom: 5px;">Scan to open on customer phone:</p>
+            <div class="qr-box"><div id="qrcode"></div></div>
+        </div>
+    </div>
+
+    <!-- CUSTOMER LOGIN -->
+    <div id="customerLoginView" class="view-section">
+        <h3>Customer Login</h3>
+        <div class="form-group">
+            <label>Registered Mobile Number</label>
+            <input type="text" id="custLoginPhone" placeholder="Enter 10-digit mobile number">
+        </div>
+        <button onclick="customerLogin()">Login / Check Points</button>
+        <button onclick="showView('roleSelectView')" class="btn-secondary">Back</button>
+    </div>
+
+    <!-- CUSTOMER DASHBOARD -->
+    <div id="customerDashboardView" class="view-section">
+        <h3 id="custWelcomeTitle" style="color: var(--primary-dark);">Welcome!</h3>
+        <div class="info-box">
+            <div><strong>Your Balance:</strong> <span id="custPointsDisplay" style="font-size: 18px; font-weight: bold; color: var(--primary);">0</span> Points</div>
+            <div><strong>Rupee Value:</strong> ₹<span id="custRupeeDisplay">0.00</span> <span style="font-size: 11px; color: #666;">(10 Pts = ₹1)</span></div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 15px 0;">
+
+        <h4 style="margin: 0 0 10px 0; font-size: 14px;">Claim Points with New Bill</h4>
+        <div style="text-align: center; margin-bottom: 12px;">
+            <a href="https://share.google/JIEXiaTKgKE6kEQOp" target="_blank" style="display: inline-block; background: #2563eb; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
+                ⭐ Leave Google Review First
+            </a>
+        </div>
+        <div class="form-group">
+            <label>Total Bill Amount (₹)</label>
+            <input type="number" id="billAmount" placeholder="e.g. 5000">
+        </div>
+        <div class="form-group">
+            <label>Payment Status</label>
+            <select id="paymentStatus">
+                <option value="full">Paid Full Payment / Cleared</option>
+                <option value="partial">Partial Payment / Due</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Upload Bill Image</label>
+            <input type="file" id="billImage" accept="image/*">
+        </div>
+        <button onclick="submitBillClaim()">Submit Bill for Approval</button>
+        <button onclick="logoutCustomer()" class="btn-secondary">Logout</button>
+    </div>
+
+    <!-- ADMIN LOGIN -->
+    <div id="adminLoginView" class="view-section">
+        <h3>Admin Login</h3>
+        <div class="form-group">
+            <label>Admin Passcode</label>
+            <input type="password" id="adminPass" placeholder="Enter passcode (default: 1234)">
+        </div>
+        <button onclick="adminLogin()">Login to Dashboard</button>
+        <button onclick="showView('roleSelectView')" class="btn-secondary">Back</button>
+    </div>
+
+    <!-- ADMIN DASHBOARD -->
+    <div id="adminDashboardView" class="view-section">
+        <h3>Admin Control Panel</h3>
+        <div class="nav-tabs">
+            <button onclick="switchAdminTab('customersTab')" id="tabBtnCust" style="background: var(--primary);">Customers</button>
+            <button onclick="switchAdminTab('pendingTab')" id="tabBtnPending" class="btn-secondary">Pending Bills (<span id="pendingCount">0</span>)</button>
+            <button onclick="switchAdminTab('historyTab')" id="tabBtnHistory" class="btn-secondary">History</button>
+        </div>
+
+        <!-- Tab 1: Customers -->
+        <div id="customersTab" class="admin-tab">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label style="margin:0;">Customer Accounts</label>
+                <button onclick="openAddCustomerModal()" style="width: auto; padding: 4px 8px; font-size: 11px; margin:0;">+ Add</button>
+            </div>
+            <div style="max-height: 220px; overflow-y: auto;">
+                <table>
+                    <thead><tr><th>Name/Phone</th><th>Points</th><th>Action</th></tr></thead>
+                    <tbody id="adminCustomerTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 2: Pending Bills (Feature 1 & 2) -->
+        <div id="pendingTab" class="admin-tab" style="display: none;">
+            <label>Pending Bills for Approval</label>
+            <div style="max-height: 220px; overflow-y: auto;">
+                <table>
+                    <thead><tr><th>Cust</th><th>Bill</th><th>Pts</th><th>Action</th></tr></thead>
+                    <tbody id="adminPendingBillsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 3: History -->
+        <div id="historyTab" class="admin-tab" style="display: none;">
+            <label>Approved Bills History</label>
+            <div style="max-height: 220px; overflow-y: auto;">
+                <table>
+                    <thead><tr><th>Cust</th><th>Bill</th><th>Pts</th><th>Status</th></tr></thead>
+                    <tbody id="adminHistoryTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <button onclick="showView('roleSelectView')" class="btn-secondary" style="margin-top: 15px;">Logout Admin</button>
+    </div>
+</div>
+
+<script>
+    // --- SUPABASE CONFIGURATION ---
+    const SUPABASE_URL = 'https://yvykhapyebutlslvtayh.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_kW2Rr8Wmt-64RenO6yVdqA_qwIs1bqh'; 
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const currentUrl = window.location.href.split('#')[0];
+        document.getElementById("qrcode").innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), {
+            text: currentUrl, width: 120, height: 120, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H
+        });
+    });
+
+    function showView(viewId) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+    }
+
+    let activeCustomer = null;
+
+    async function customerLogin() {
+        const phone = document.getElementById('custLoginPhone').value.trim();
+        if (!phone || phone.length < 10) { alert('Please enter a valid 10-digit mobile number.'); return; }
+
+        let { data, error } = await supabase.from('customers').select('*').eq('phone', phone).single();
+
+        if (!data) {
+            const name = prompt("New mobile number! Please enter your Full Name:") || "Valued Customer";
+            let { data: newData, error: insertError } = await supabase.from('customers').insert([{ phone, name, points: 0 }]).select().single();
+            if (insertError) { alert('Error registering user.'); return; }
+            activeCustomer = newData;
+        } else {
+            activeCustomer = data;
+        }
+
+        loadCustomerDashboard();
+        showView('customerDashboardView');
+    }
+
+    function loadCustomerDashboard() {
+        document.getElementById('custWelcomeTitle').innerText = `Welcome, ${activeCustomer.name}!`;
+        document.getElementById('custPointsDisplay').innerText = activeCustomer.points;
+        document.getElementById('custRupeeDisplay').innerText = (activeCustomer.points / 10).toFixed(2);
+    }
+
+    function logoutCustomer() {
+        activeCustomer = null;
+        document.getElementById('custLoginPhone').value = '';
+        showView('roleSelectView');
+    }
+
+    // Feature 1: Submit bill as Pending for Admin Approval
+    async function submitBillClaim() {
+        const amountInput = document.getElementById('billAmount').value;
+        const paymentStatus = document.getElementById('paymentStatus').value;
+        const billImageFile = document.getElementById('billImage').files[0];
+
+        if (!amountInput || amountInput <= 0) { alert('Enter valid amount.'); return; }
+        if (!billImageFile) { alert('Please upload bill photo.'); return; }
+        if (paymentStatus !== 'full') { alert('Points only credited on full payment / cleared bills.'); return; }
+
+        const amount = parseFloat(amountInput);
+        const pointsEarned = Math.round(amount * 0.10);
+
+        // Convert image to Base64 data URL so admin can view it easily from DB
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const base64Image = e.target.result;
+
+            let { error } = await supabase.from('bills').insert([{
+                id: Date.now(),
+                phone: activeCustomer.phone,
+                name: activeCustomer.name,
+                amount: amount,
+                points: pointsEarned,
+                status: 'Pending',
+                image_url: base64Image
+            }]);
+
+            if (error) {
+                alert('Error submitting bill. Make sure your database has an image_url text column.');
+            } else {
+                alert('Bill submitted successfully! Waiting for admin approval.');
+                document.getElementById('billAmount').value = '';
+                document.getElementById('billImage').value = '';
+                loadCustomerDashboard();
+            }
+        };
+        reader.readAsDataURL(billImageFile);
+    }
+
+    function adminLogin() {
+        if (document.getElementById('adminPass').value === '1234') {
+            loadAdminDashboard();
+            showView('adminDashboardView');
+            document.getElementById('adminPass').value = '';
+        } else {
+            alert('Incorrect Passcode (Default: 1234)');
+        }
+    }
+
+    function switchAdminTab(tabId) {
+        document.querySelectorAll('.admin-tab').forEach(el => el.style.display = 'none');
+        document.getElementById(tabId).style.display = 'block';
+        document.getElementById('tabBtnCust').style.background = tabId === 'customersTab' ? 'var(--primary)' : '#6b7280';
+        document.getElementById('tabBtnPending').style.background = tabId === 'pendingTab' ? 'var(--primary)' : '#6b7280';
+        document.getElementById('tabBtnHistory').style.background = tabId === 'historyTab' ? 'var(--primary)' : '#6b7280';
+    }
+
+    async function loadAdminDashboard() {
+        // Load Customers
+        let { data: customers } = await supabase.from('customers').select('*');
+        let custHtml = '';
+        (customers || []).forEach(c => {
+            custHtml += `<tr>
+                <td><b>${c.name}</b><br><small>${c.phone}</small></td>
+                <td><b>${c.points} pts</b></td>
+                <td>
+                    <button onclick="adminEditPoints('${c.phone}', ${c.points})" style="padding:2px 4px; font-size:10px;">Edit</button>
+                    <button onclick="adminRedeemPoints('${c.phone}', ${c.points})" style="padding:2px 4px; font-size:10px; background:#10b981;">Redeem</button>
+                    <button onclick="adminDeleteCust('${c.phone}')" style="padding:2px 4px; font-size:10px;" class="btn-danger">Del</button>
+                </td>
+            </tr>`;
+        });
+        document.getElementById('adminCustomerTableBody').innerHTML = custHtml || '<tr><td colspan="3" style="text-align:center;">No customers</td></tr>';
+
+        // Load Bills (Pending & History)
+        let { data: bills } = await supabase.from('bills').select('*').order('id', { ascending: false });
+        let pendingHtml = '';
+        let historyHtml = '';
+        let pendingCount = 0;
+
+        (bills || []).forEach(b => {
+            if (b.status === 'Pending') {
+                pendingCount++;
+                pendingHtml += `<tr>
+                    <td>${b.name}<br><small>${b.phone}</small></td>
+                    <td>₹${b.amount}</td>
+                    <td><b>+${b.points}</b></td>
+                    <td>
+                        <button onclick="viewBillImage('${b.image_url}')" style="padding:2px 4px; font-size:10px; background:#2563eb;">View</button>
+                        <button onclick="approveBill(${b.id}, '${b.phone}', ${b.points})" style="padding:2px 4px; font-size:10px; background:#10b981;">Approve</button>
+                    </td>
+                </tr>`;
+            } else {
+                historyHtml += `<tr>
+                    <td>${b.name}<br><small>${b.phone}</small></td>
+                    <td>₹${b.amount}</td>
+                    <td><b>+${b.points}</b></td>
+                    <td><span style="color:green">Approved</span></td>
+                </tr>`;
+            }
+        });
+
+        document.getElementById('pendingCount').innerText = pendingCount;
+        document.getElementById('adminPendingBillsBody').innerHTML = pendingHtml || '<tr><td colspan="4" style="text-align:center;">No pending bills</td></tr>';
+        document.getElementById('adminHistoryTableBody').innerHTML = historyHtml || '<tr><td colspan="4" style="text-align:center;">No history</td></tr>';
+    }
+
+    // Feature 2: View Uploaded Bill Image Modal/Popup
+    function viewBillImage(imgUrl) {
+        if (!imgUrl) { alert('No image attached.'); return; }
+        let win = window.open();
+        win.document.write(`<iframe src="${imgUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`);
+    }
+
+    // Feature 1 & 3: Approve Bill, Credit Points, and WhatsApp Alert Link
+    async function approveBill(billId, phone, pointsToAdd) {
+        // Get customer current points
+        let { data: cust } = await supabase.from('customers').select('*').eq('phone', phone).single();
+        if (!cust) { alert('Customer not found!'); return; }
+
+        let newPoints = cust.points + pointsToAdd;
+
+        // Update customer points
+        await supabase.from('customers').update({ points: newPoints }).eq('phone', phone);
+        // Update bill status to Approved
+        await supabase.from('bills').update({ status: 'Approved' }).eq('id', billId);
+
+        alert(`Bill approved! ${pointsToAdd} points credited to ${cust.name}.`);
+        loadAdminDashboard();
+
+        // Feature 3: WhatsApp Alert option
+        if (confirm(`Do you want to send a WhatsApp confirmation message to ${cust.name} (${phone})?`)) {
+            let msg = `प्रिय ${cust.name}, श्री राधे राधे ज्वेलर्स में आपका बिल अप्रूव हो गया है! आपके खाते में ${pointsToAdd} पॉइंट्स (कुल: ${newPoints} पॉइंट्स) जोड़ दिए गए हैं। धन्यवाद! 🙏`;
+            window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+    }
+
+    async function openAddCustomerModal() {
+        const name = prompt("Customer Name:");
+        const phone = prompt("10-digit Mobile Number:");
+        if (!name || !phone || phone.length < 10) return;
+        await supabase.from('customers').insert([{ phone, name, points: 0 }]);
+        loadAdminDashboard();
+    }
+
+    async function adminEditPoints(phone, currentPoints) {
+        const type = prompt("Type 'add' to add points or 'reduce' to deduct:", "add");
+        if (!type) return;
+        const val = parseInt(prompt("Enter points:", "50"));
+        if (isNaN(val)) return;
+
+        let newPoints = type.toLowerCase() === 'add' ? currentPoints + val : Math.max(0, currentPoints - val);
+        await supabase.from('customers').update({ points: newPoints }).eq('phone', phone);
+        loadAdminDashboard();
+        alert('Updated successfully!');
+    }
+
+    async function adminRedeemPoints(phone, currentPoints) {
+        const rupee = parseFloat(prompt(`Available: ${currentPoints} pts (₹${currentPoints/10}).\nEnter rupee value to redeem:`, "10"));
+        if (isNaN(rupee) || rupee <= 0) return;
+        const ptsToDeduct = Math.round(rupee * 10);
+        if (ptsToDeduct > currentPoints) { alert('Not enough points!'); return; }
+
+        let newPoints = currentPoints - ptsToDeduct;
+        await supabase.from('customers').update({ points: newPoints }).eq('phone', phone);
+        loadAdminDashboard();
+        alert(`Successfully redeemed ₹${rupee}!`);
+    }
+
+    async function adminDeleteCust(phone) {
+        if (confirm("Delete customer?")) {
+            await supabase.from('customers').delete().eq('phone', phone);
+            loadAdminDashboard();
+        }
+    }
+</script>
+
+</body>
+</html>
