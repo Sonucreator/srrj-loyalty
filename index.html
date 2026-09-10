@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>श्री राधे राधे ज्वेलर्स - Cloud Loyalty System</title>
+    <title>श्री राधे राधे ज्वेलर्स - Loyalty System</title>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #d97706; --primary-dark: #b45309; --bg: #fffbeb; --card-bg: #ffffff; --text: #1f2937; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; }
-        .container { background: var(--card-bg); width: 100%; max-width: 500px; padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); box-sizing: border-box; }
+        .container { background: var(--card-bg); width: 100%; max-width: 500px; padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); box-sizing: border-box; position: relative; }
         h2 { text-align: center; color: var(--primary-dark); margin-top: 0; margin-bottom: 2px; }
         .subtitle { text-align: center; font-size: 13px; color: #6b7280; margin-bottom: 12px; }
         .ticker { background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 600; text-align: center; padding: 6px; border-radius: 6px; margin-bottom: 15px; }
@@ -24,14 +24,17 @@
         .btn-secondary:hover { background-color: #4b5563; }
         .btn-danger { background-color: #dc2626; }
         .btn-danger:hover { background-color: #b91c1c; }
-        .nav-tabs { display: flex; gap: 4px; margin-bottom: 15px; }
-        .nav-tabs button { margin-top: 0; flex: 1; font-size: 11px; padding: 8px 2px; }
+        .nav-tabs { display: flex; gap: 6px; margin-bottom: 15px; }
+        .nav-tabs button { margin-top: 0; flex: 1; font-size: 12px; padding: 8px 4px; }
         .info-box { font-size: 13px; color: #4b5563; background: #f3f4f6; padding: 10px; border-radius: 6px; margin-bottom: 15px; line-height: 1.4; }
         table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
         th, td { border: 1px solid #e5e7eb; padding: 6px; text-align: left; word-break: break-word; }
         th { background-color: #f9fafb; }
         .qr-box { display: flex; justify-content: center; margin: 15px 0; }
         .qr-box div { padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; }
+        #imageModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+        #imageModal img { max-width: 90%; max-height: 80vh; border-radius: 8px; border: 2px solid white; }
+        #imageModal button { width: auto; padding: 8px 20px; margin-top: 15px; background: #dc2626; }
     </style>
 </head>
 <body>
@@ -39,7 +42,7 @@
 <div class="container">
     <h2>श्री राधे राधे ज्वेलर्स</h2>
     <div class="subtitle">Cloud Loyalty Point System</div>
-    <div class="ticker">🪙 Earn 10% Points on Every Purchase! (10 Pts = ₹1)</div>
+    <div class="ticker">🪙 Gold (24K): ₹72,500/10g | Silver: ₹85,000/kg</div>
 
     <!-- ROLE SELECTOR -->
     <div id="roleSelectView" class="view-section active">
@@ -70,7 +73,6 @@
         <div class="info-box">
             <div><strong>Your Balance:</strong> <span id="custPointsDisplay" style="font-size: 18px; font-weight: bold; color: var(--primary);">0</span> Points</div>
             <div><strong>Rupee Value:</strong> ₹<span id="custRupeeDisplay">0.00</span> <span style="font-size: 11px; color: #666;">(10 Pts = ₹1)</span></div>
-            <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">⏳ Points Validity: 1 Year from Issue</div>
         </div>
 
         <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 15px 0;">
@@ -80,7 +82,6 @@
             <a href="https://share.google/JIEXiaTKgKE6kEQOp" target="_blank" style="display: inline-block; background: #2563eb; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
                 ⭐ Leave Google Review First
             </a>
-            <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">(Show screenshot to shop counter)</div>
         </div>
         <div class="form-group">
             <label>Total Bill Amount (₹)</label>
@@ -123,12 +124,12 @@
 
         <div id="customersTab" class="admin-tab">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label style="margin:0;">Customer Accounts & Reviews</label>
+                <label style="margin:0;">Customer Accounts</label>
                 <button type="button" onclick="window.srrjOpenAddCustomerModal()" style="width: auto; padding: 4px 8px; font-size: 11px; margin:0;">+ Add</button>
             </div>
             <div style="max-height: 220px; overflow-y: auto;">
                 <table>
-                    <thead><tr><th>Name/Phone</th><th>Points</th><th>Review?</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Name/Phone</th><th>Points</th><th>Action</th></tr></thead>
                     <tbody id="adminCustomerTableBody"></tbody>
                 </table>
             </div>
@@ -156,6 +157,12 @@
 
         <button type="button" onclick="window.srrjShowView('roleSelectView')" class="btn-secondary" style="margin-top: 15px;">Logout Admin</button>
     </div>
+</div>
+
+<!-- IMAGE MODAL POPUP -->
+<div id="imageModal">
+    <img id="modalImg" src="" alt="Bill Image">
+    <button type="button" onclick="window.srrjCloseModal()">Close Preview</button>
 </div>
 
 <script>
@@ -189,30 +196,23 @@
         const phone = phoneInput.value.trim();
         if (!phone || phone.length < 10) { alert('Please enter a valid 10-digit mobile number.'); return; }
 
-        let { data, error } = await dbClient.from('customers').select('*').eq('phone', phone).single();
+        let { data, error } = await dbClient.from('customers').select('*').eq('phone', phone);
 
-        if (!data) {
+        if (error) {
+            alert('Database error: ' + error.message);
+            return;
+        }
+
+        if (!data || data.length === 0) {
             const name = prompt("New mobile number! Please enter your Full Name:") || "Valued Customer";
-            const referrer = prompt("Enter Referral Mobile Number (if any, else leave blank):") || "";
-            
-            let referralPoints = 0;
-            if(referrer && referrer.length >= 10) {
-                let { data: refData } = await dbClient.from('customers').select('*').eq('phone', referrer).single();
-                if(refData) {
-                    referralPoints = 20;
-                    await dbClient.from('customers').update({ points: refData.points + 20 }).eq('phone', referrer);
-                }
+            let { data: newData, error: insertError } = await dbClient.from('customers').insert([{ phone, name, points: 0 }]).select();
+            if (insertError || !newData || newData.length === 0) { 
+                alert('Error registering user. Please check Supabase RLS policies.'); 
+                return; 
             }
-
-            let { data: newData, error: insertError } = await dbClient.from('customers').insert([{ 
-                phone, name, points: referralPoints, referred_by: referrer, google_review_given: false 
-            }]).select().single();
-
-            if (insertError) { alert('Error registering user.'); return; }
-            activeCustomer = newData;
-            if(referralPoints > 0) alert('Welcome bonus! 20 points added via referral.');
+            activeCustomer = newData[0];
         } else {
-            activeCustomer = data;
+            activeCustomer = data[0];
         }
 
         loadCustomerDashboard();
@@ -258,7 +258,7 @@
             }]);
 
             if (error) {
-                alert('Error submitting bill.');
+                alert('Error submitting bill: ' + error.message);
             } else {
                 alert('Bill submitted successfully! Waiting for admin approval.');
                 document.getElementById('billAmount').value = '';
@@ -292,22 +292,17 @@
         let { data: customers } = await dbClient.from('customers').select('*');
         let custHtml = '';
         (customers || []).forEach(c => {
-            const reviewStatus = c.google_review_given ? '<span style="color:green; font-weight:bold;">Yes ⭐</span>' : '<span style="color:red;">No</span>';
-            const toggleText = c.google_review_given ? 'Mark No' : 'Mark Yes';
-
             custHtml += `<tr>
                 <td><b>${c.name}</b><br><small>${c.phone}</small></td>
                 <td><b>${c.points} pts</b></td>
-                <td>${reviewStatus}</td>
                 <td>
-                    <button type="button" onclick="window.srrjToggleReview('${c.phone}', ${!c.google_review_given})" style="padding:2px 4px; font-size:9px; background:#2563eb;">${toggleText}</button>
-                    <button type="button" onclick="window.srrjEditPoints('${c.phone}', ${c.points})" style="padding:2px 4px; font-size:9px;">Edit</button>
-                    <button type="button" onclick="window.srrjRedeemPoints('${c.phone}', ${c.points})" style="padding:2px 4px; font-size:9px; background:#10b981;">Redeem</button>
-                    <button type="button" onclick="window.srrjDeleteCust('${c.phone}')" style="padding:2px 4px; font-size:9px;" class="btn-danger">Del</button>
+                    <button type="button" onclick="window.srrjEditPoints('${c.phone}', ${c.points})" style="padding:2px 4px; font-size:10px;">Edit</button>
+                    <button type="button" onclick="window.srrjRedeemPoints('${c.phone}', ${c.points})" style="padding:2px 4px; font-size:10px; background:#10b981;">Redeem</button>
+                    <button type="button" onclick="window.srrjDeleteCust('${c.phone}')" style="padding:2px 4px; font-size:10px;" class="btn-danger">Del</button>
                 </td>
             </tr>`;
         });
-        document.getElementById('adminCustomerTableBody').innerHTML = custHtml || '<tr><td colspan="4" style="text-align:center;">No customers</td></tr>';
+        document.getElementById('adminCustomerTableBody').innerHTML = custHtml || '<tr><td colspan="3" style="text-align:center;">No customers</td></tr>';
 
         let { data: bills } = await dbClient.from('bills').select('*').order('id', { ascending: false });
         let pendingHtml = '';
@@ -341,20 +336,24 @@
         document.getElementById('adminHistoryTableBody').innerHTML = historyHtml || '<tr><td colspan="4" style="text-align:center;">No history</td></tr>';
     }
 
-    window.srrjToggleReview = async function(phone, status) {
-        await dbClient.from('customers').update({ google_review_given: status }).eq('phone', phone);
-        loadAdminDashboard();
-    };
-
     window.srrjViewBillImage = function(imgUrl) {
         if (!imgUrl) { alert('No image attached.'); return; }
-        let win = window.open();
-        win.document.write(`<iframe src="${imgUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`);
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImg');
+        modalImg.src = imgUrl;
+        modal.style.display = 'flex';
+    };
+
+    window.srrjCloseModal = function() {
+        const modal = document.getElementById('imageModal');
+        modal.style.display = 'none';
+        document.getElementById('modalImg').src = '';
     };
 
     window.srrjApproveBill = async function(billId, phone, pointsToAdd) {
-        let { data: cust } = await dbClient.from('customers').select('*').eq('phone', phone).single();
-        if (!cust) { alert('Customer not found!'); return; }
+        let { data: custArr } = await dbClient.from('customers').select('*').eq('phone', phone);
+        if (!custArr || custArr.length === 0) { alert('Customer not found!'); return; }
+        let cust = custArr[0];
 
         let newPoints = cust.points + pointsToAdd;
         await dbClient.from('customers').update({ points: newPoints }).eq('phone', phone);
@@ -373,7 +372,7 @@
         const name = prompt("Customer Name:");
         const phone = prompt("10-digit Mobile Number:");
         if (!name || !phone || phone.length < 10) return;
-        await dbClient.from('customers').insert([{ phone, name, points: 0, google_review_given: false }]);
+        await dbClient.from('customers').insert([{ phone, name, points: 0 }]);
         loadAdminDashboard();
     };
 
