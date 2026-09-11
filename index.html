@@ -42,7 +42,7 @@
 <div class="container">
     <h2>श्री राधे राधे ज्वेलर्स</h2>
     <div class="subtitle">Cloud Loyalty Point System</div>
-    <div class="ticker">🪙 Gold (24K): ₹72,500/10g | Silver: ₹85,000/kg</div>
+    <div class="ticker">🪙 ₹100 = 1 Point | 1 Point = ₹1 Value</div>
 
     <!-- ROLE SELECTOR -->
     <div id="roleSelectView" class="view-section active">
@@ -72,14 +72,14 @@
         <h3 id="custWelcomeTitle" style="color: var(--primary-dark);">Welcome!</h3>
         <div class="info-box">
             <div><strong>Your Balance:</strong> <span id="custPointsDisplay" style="font-size: 18px; font-weight: bold; color: var(--primary);">0</span> Points</div>
-            <div><strong>Rupee Value:</strong> ₹<span id="custRupeeDisplay">0.00</span> <span style="font-size: 11px; color: #666;">(10 Pts = ₹1)</span></div>
+            <div><strong>Rupee Value:</strong> ₹<span id="custRupeeDisplay">0.00</span> <span style="font-size: 11px; color: #666;">(1 Pt = ₹1)</span></div>
         </div>
 
         <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 15px 0;">
 
         <h4 style="margin: 0 0 10px 0; font-size: 14px;">Claim Points with New Bill</h4>
         <div style="text-align: center; margin-bottom: 12px;">
-            <a href="https://share.google/JIEXiaTKgKE6kEQOp" target="_blank" style="display: inline-block; background: #2563eb; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
+            <a href="https://g.page/r/CWnLb3JN7IYsEAI/review" target="_blank" onclick="window.srrjMarkReviewDone()" style="display: inline-block; background: #2563eb; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
                 ⭐ Leave Google Review First
             </a>
         </div>
@@ -124,12 +124,12 @@
 
         <div id="customersTab" class="admin-tab">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label style="margin:0;">Customer Accounts</label>
+                <label style="margin:0;">Customer Accounts & Details</label>
                 <button type="button" onclick="window.srrjOpenAddCustomerModal()" style="width: auto; padding: 4px 8px; font-size: 11px; margin:0;">+ Add</button>
             </div>
             <div style="max-height: 220px; overflow-y: auto;">
                 <table>
-                    <thead><tr><th>Name/Phone</th><th>Points</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Customer Info</th><th>Points / Review</th><th>Action</th></tr></thead>
                     <tbody id="adminCustomerTableBody"></tbody>
                 </table>
             </div>
@@ -197,19 +197,12 @@
         if (!phone || phone.length < 10) { alert('Please enter a valid 10-digit mobile number.'); return; }
 
         let { data, error } = await dbClient.from('customers').select('*').eq('phone', phone);
-
-        if (error) {
-            alert('Database error: ' + error.message);
-            return;
-        }
+        if (error) { alert('Database error: ' + error.message); return; }
 
         if (!data || data.length === 0) {
             const name = prompt("New mobile number! Please enter your Full Name:") || "Valued Customer";
-            let { data: newData, error: insertError } = await dbClient.from('customers').insert([{ phone, name, points: 0 }]).select();
-            if (insertError || !newData || newData.length === 0) { 
-                alert('Error registering user. Please check Supabase RLS policies.'); 
-                return; 
-            }
+            let { data: newData, error: insertError } = await dbClient.from('customers').insert([{ phone, name, points: 0, google_review_given: false }]).select();
+            if (insertError || !newData || newData.length === 0) { alert('Error registering user.'); return; }
             activeCustomer = newData[0];
         } else {
             activeCustomer = data[0];
@@ -223,8 +216,14 @@
         if(!activeCustomer) return;
         document.getElementById('custWelcomeTitle').innerText = `Welcome, ${activeCustomer.name}!`;
         document.getElementById('custPointsDisplay').innerText = activeCustomer.points;
-        document.getElementById('custRupeeDisplay').innerText = (activeCustomer.points / 10).toFixed(2);
+        document.getElementById('custRupeeDisplay').innerText = activeCustomer.points.toFixed(2);
     }
+
+    window.srrjMarkReviewDone = async function() {
+        if(!activeCustomer) return;
+        activeCustomer.google_review_given = true;
+        await dbClient.from('customers').update({ google_review_given: true }).eq('phone', activeCustomer.phone);
+    };
 
     window.srrjLogoutCustomer = function() {
         activeCustomer = null;
@@ -242,7 +241,22 @@
         if (paymentStatus !== 'full') { alert('Points only credited on full payment / cleared bills.'); return; }
 
         const amount = parseFloat(amountInput);
-        const pointsEarned = Math.round(amount * 0.10);
+
+        let { data: existingBills, error: checkErr } = await dbClient.from('bills')
+            .select('*')
+            .eq('phone', activeCustomer.phone)
+            .eq('amount', amount);
+
+        if (!checkErr && existingBills && existingBills.length > 0) {
+            alert('⚠️ Duplicate Warning: You have already submitted a bill with this exact amount!');
+            return;
+        }
+
+        const pointsEarned = Math.floor(amount / 100);
+        if (pointsEarned <= 0) {
+            alert('Minimum bill amount should be ₹100 to earn points.');
+            return;
+        }
 
         const reader = new FileReader();
         reader.onload = async function(e) {
@@ -260,7 +274,7 @@
             if (error) {
                 alert('Error submitting bill: ' + error.message);
             } else {
-                alert('Bill submitted successfully! Waiting for admin approval.');
+                alert(`Bill submitted successfully! You will get ${pointsEarned} points upon approval.`);
                 document.getElementById('billAmount').value = '';
                 document.getElementById('billImage').value = '';
                 loadCustomerDashboard();
@@ -292,9 +306,10 @@
         let { data: customers } = await dbClient.from('customers').select('*');
         let custHtml = '';
         (customers || []).forEach(c => {
+            let reviewStatus = c.google_review_given ? '<span style="color: #16a34a; font-weight: bold;">⭐ Review Done</span>' : '<span style="color: #dc2626;">Review Pending</span>';
             custHtml += `<tr>
-                <td><b>${c.name}</b><br><small>${c.phone}</small></td>
-                <td><b>${c.points} pts</b></td>
+                <td><b>${c.name}</b><br><small>Ph: ${c.phone}</small></td>
+                <td><b>${c.points} pts</b><br>${reviewStatus}</td>
                 <td>
                     <button type="button" onclick="window.srrjEditPoints('${c.phone}', ${c.points})" style="padding:2px 4px; font-size:10px;">Edit</button>
                     <button type="button" onclick="window.srrjRedeemPoints('${c.phone}', ${c.points})" style="padding:2px 4px; font-size:10px; background:#10b981;">Redeem</button>
@@ -372,7 +387,7 @@
         const name = prompt("Customer Name:");
         const phone = prompt("10-digit Mobile Number:");
         if (!name || !phone || phone.length < 10) return;
-        await dbClient.from('customers').insert([{ phone, name, points: 0 }]);
+        await dbClient.from('customers').insert([{ phone, name, points: 0, google_review_given: false }]);
         loadAdminDashboard();
     };
 
@@ -389,9 +404,9 @@
     };
 
     window.srrjRedeemPoints = async function(phone, currentPoints) {
-        const rupee = parseFloat(prompt(`Available: ${currentPoints} pts (₹${currentPoints/10}).\nEnter rupee value to redeem:`, "10"));
+        const rupee = parseFloat(prompt(`Available: ${currentPoints} pts (₹${currentPoints}).\nEnter rupee value to redeem:`, "10"));
         if (isNaN(rupee) || rupee <= 0) return;
-        const ptsToDeduct = Math.round(rupee * 10);
+        const ptsToDeduct = Math.round(rupee);
         if (ptsToDeduct > currentPoints) { alert('Not enough points!'); return; }
 
         let newPoints = currentPoints - ptsToDeduct;
