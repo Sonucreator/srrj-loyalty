@@ -32,9 +32,10 @@
         th { background-color: #f9fafb; }
         .qr-box { display: flex; justify-content: center; margin: 15px 0; }
         .qr-box div { padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; }
-        #imageModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+        #imageModal, #waModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
         #imageModal img { max-width: 90%; max-height: 80vh; border-radius: 8px; border: 2px solid white; }
-        #imageModal button { width: auto; padding: 8px 20px; margin-top: 15px; background: #dc2626; }
+        .modal-card { background: white; width: 90%; max-width: 380px; padding: 20px; border-radius: 12px; text-align: center; }
+        .modal-card textarea { width: 100%; height: 100px; margin-bottom: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -162,7 +163,17 @@
 <!-- IMAGE MODAL POPUP -->
 <div id="imageModal">
     <img id="modalImg" src="" alt="Bill Image">
-    <button type="button" onclick="window.srrjCloseModal()">Close Preview</button>
+    <button type="button" onclick="window.srrjCloseModal()" style="width: auto; padding: 8px 20px; margin-top: 15px; background: #dc2626;">Close Preview</button>
+</div>
+
+<!-- WHATSAPP POPUP MODAL -->
+<div id="waModal">
+    <div class="modal-card">
+        <h4 style="margin-top:0; color:var(--primary-dark);">Send WhatsApp Message</h4>
+        <textarea id="waMsgBox"></textarea>
+        <a id="waSendBtn" href="" target="_blank" style="display: block; background: #16a34a; color: white; padding: 10px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-bottom: 8px;">💬 Open WhatsApp & Send</a>
+        <button type="button" onclick="window.srrjCloseWaModal()" class="btn-secondary" style="margin-top:0;">Close</button>
+    </div>
 </div>
 
 <script>
@@ -174,10 +185,8 @@
     let activeCustomer = null;
     let inactivityTimer = null;
 
-    // Inactivity Logout (2 Minutes)
     function resetInactivityTimer() {
         clearTimeout(inactivityTimer);
-        // 2 minutes = 120,000 milliseconds
         inactivityTimer = setTimeout(() => {
             const isAdminLoggedIn = document.getElementById('adminDashboardView').classList.contains('active');
             const isCustLoggedIn = document.getElementById('customerDashboardView').classList.contains('active');
@@ -203,7 +212,6 @@
             });
         }
 
-        // Persistent Login Check on Refresh
         const savedAdmin = sessionStorage.getItem('srrj_admin_logged');
         const savedCustPhone = sessionStorage.getItem('srrj_cust_phone');
 
@@ -422,6 +430,10 @@
         document.getElementById('modalImg').src = '';
     };
 
+    window.srrjCloseWaModal = function() {
+        document.getElementById('waModal').style.display = 'none';
+    };
+
     window.srrjApproveBill = async function(billId, phone, pointsToAdd) {
         let { data: custArr } = await dbClient.from('customers').select('*').eq('phone', phone);
         if (!custArr || custArr.length === 0) { alert('Customer not found!'); return; }
@@ -431,13 +443,12 @@
         await dbClient.from('customers').update({ points: newPoints }).eq('phone', phone);
         await dbClient.from('bills').update({ status: 'Approved' }).eq('id', billId);
 
-        alert(`Bill approved! ${pointsToAdd} points credited to ${cust.name}.`);
         loadAdminDashboard();
 
-        if (confirm(`Send WhatsApp confirmation message to ${cust.name} (${phone})?`)) {
-            let msg = `प्रिय ${cust.name}, श्री राधे राधे ज्वेलर्स में आपका बिल अप्रूव हो गया है! आपके खाते में ${pointsToAdd} पॉइंट्स जोड़ दिए गए हैं। धन्यवाद! 🙏`;
-            window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, '_blank');
-        }
+        let msg = `प्रिय ${cust.name}, श्री राधे राधे ज्वेलर्स में आपका बिल अप्रूव हो गया है! आपके खाते में ${pointsToAdd} पॉइंट्स जोड़ दिए गए हैं। धन्यवाद! 🙏`;
+        document.getElementById('waMsgBox').value = msg;
+        document.getElementById('waSendBtn').href = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
+        document.getElementById('waModal').style.display = 'flex';
     };
 
     window.srrjOpenAddCustomerModal = async function() {
@@ -461,15 +472,23 @@
     };
 
     window.srrjRedeemPoints = async function(phone, currentPoints) {
-        const rupee = parseFloat(prompt(`Available: ${currentPoints} pts (₹${currentPoints}).\nEnter rupee value to redeem:`, "10"));
+        let { data: custArr } = await dbClient.from('customers').select('*').eq('phone', phone);
+        if (!custArr || custArr.length === 0) { alert('Customer not found!'); return; }
+        let cust = custArr[0];
+
+        const rupee = parseFloat(prompt(`Available: ${cust.points} pts (₹${cust.points}).\nEnter rupee value to redeem:`, "10"));
         if (isNaN(rupee) || rupee <= 0) return;
         const ptsToDeduct = Math.round(rupee);
-        if (ptsToDeduct > currentPoints) { alert('Not enough points!'); return; }
+        if (ptsToDeduct > cust.points) { alert('Not enough points!'); return; }
 
-        let newPoints = currentPoints - ptsToDeduct;
+        let newPoints = cust.points - ptsToDeduct;
         await dbClient.from('customers').update({ points: newPoints }).eq('phone', phone);
         loadAdminDashboard();
-        alert(`Successfully redeemed ₹${rupee}!`);
+
+        let msg = `प्रिय ${cust.name}, श्री राधे राधे ज्वेलर्स में आपके ₹${rupee} (पॉइंट्स: ${ptsToDeduct}) सफलतापूर्वक रिडीम हो गए हैं। अब आपके खाते में ${newPoints} पॉइंट्स शेष हैं। धन्यवाद! 🙏`;
+        document.getElementById('waMsgBox').value = msg;
+        document.getElementById('waSendBtn').href = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
+        document.getElementById('waModal').style.display = 'flex';
     };
 
     window.srrjDeleteCust = async function(phone) {
