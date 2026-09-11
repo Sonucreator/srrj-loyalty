@@ -155,7 +155,7 @@
             </div>
         </div>
 
-        <button type="button" onclick="window.srrjShowView('roleSelectView')" class="btn-secondary" style="margin-top: 15px;">Logout Admin</button>
+        <button type="button" onclick="window.srrjLogoutAdmin()" class="btn-secondary" style="margin-top: 15px;">Logout Admin</button>
     </div>
 </div>
 
@@ -171,6 +171,28 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_kW2Rr8Wmt-64RenO6yVdqA_qwIs1bqh'; 
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    let activeCustomer = null;
+    let inactivityTimer = null;
+
+    // Inactivity Logout (2 Minutes)
+    function resetInactivityTimer() {
+        clearTimeout(inactivityTimer);
+        // 2 minutes = 120,000 milliseconds
+        inactivityTimer = setTimeout(() => {
+            const isAdminLoggedIn = document.getElementById('adminDashboardView').classList.contains('active');
+            const isCustLoggedIn = document.getElementById('customerDashboardView').classList.contains('active');
+            
+            if (isAdminLoggedIn || isCustLoggedIn) {
+                alert('⚠️ Session expired due to 2 minutes of inactivity.');
+                window.srrjLogoutAdmin();
+            }
+        }, 120000);
+    }
+
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(eventType => {
+        window.addEventListener(eventType, resetInactivityTimer);
+    });
+
     document.addEventListener("DOMContentLoaded", function() {
         const currentUrl = window.location.href.split('#')[0];
         const qrContainer = document.getElementById("qrcode");
@@ -180,15 +202,31 @@
                 text: currentUrl, width: 120, height: 120, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H
             });
         }
+
+        // Persistent Login Check on Refresh
+        const savedAdmin = sessionStorage.getItem('srrj_admin_logged');
+        const savedCustPhone = sessionStorage.getItem('srrj_cust_phone');
+
+        if (savedAdmin === 'true') {
+            loadAdminDashboard();
+            window.srrjShowView('adminDashboardView');
+        } else if (savedCustPhone) {
+            dbClient.from('customers').select('*').eq('phone', savedCustPhone).then(({ data }) => {
+                if (data && data.length > 0) {
+                    activeCustomer = data[0];
+                    loadCustomerDashboard();
+                    window.srrjShowView('customerDashboardView');
+                }
+            });
+        }
     });
 
     window.srrjShowView = function(viewId) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
         const target = document.getElementById(viewId);
         if(target) target.classList.add('active');
+        resetInactivityTimer();
     };
-
-    let activeCustomer = null;
 
     window.srrjCustomerLogin = async function() {
         const phoneInput = document.getElementById('custLoginPhone');
@@ -208,6 +246,7 @@
             activeCustomer = data[0];
         }
 
+        sessionStorage.setItem('srrj_cust_phone', activeCustomer.phone);
         loadCustomerDashboard();
         window.srrjShowView('customerDashboardView');
     };
@@ -227,6 +266,7 @@
 
     window.srrjLogoutCustomer = function() {
         activeCustomer = null;
+        sessionStorage.removeItem('srrj_cust_phone');
         document.getElementById('custLoginPhone').value = '';
         window.srrjShowView('roleSelectView');
     };
@@ -286,12 +326,20 @@
     window.srrjAdminLogin = function() {
         const pass = document.getElementById('adminPass').value;
         if (pass === '5678') {
+            sessionStorage.setItem('srrj_admin_logged', 'true');
             loadAdminDashboard();
             window.srrjShowView('adminDashboardView');
             document.getElementById('adminPass').value = '';
         } else {
             alert('Incorrect Passcode');
         }
+    };
+
+    window.srrjLogoutAdmin = function() {
+        sessionStorage.removeItem('srrj_admin_logged');
+        sessionStorage.removeItem('srrj_cust_phone');
+        activeCustomer = null;
+        window.srrjShowView('roleSelectView');
     };
 
     window.srrjSwitchAdminTab = function(tabId) {
@@ -304,6 +352,11 @@
 
     async function loadAdminDashboard() {
         let { data: customers } = await dbClient.from('customers').select('*');
+        let customerMap = {};
+        (customers || []).forEach(c => {
+            customerMap[c.phone] = c;
+        });
+
         let custHtml = '';
         (customers || []).forEach(c => {
             let reviewStatus = c.google_review_given ? '<span style="color: #16a34a; font-weight: bold;">⭐ Review Done</span>' : '<span style="color: #dc2626;">Review Pending</span>';
@@ -317,7 +370,7 @@
                 </td>
             </tr>`;
         });
-        document.getElementById('adminCustomerTableBody').innerHTML = custHtml || '<tr><td colspan="3" style="text-align:center;">No customers</td></tr>';
+        document.getElementById('adminCustomerTableBody').innerHTML = custHtml || '<tr><td colspan="3" style="text-align:center;">No customers found</td></tr>';
 
         let { data: bills } = await dbClient.from('bills').select('*').order('id', { ascending: false });
         let pendingHtml = '';
@@ -325,10 +378,14 @@
         let pendingCount = 0;
 
         (bills || []).forEach(b => {
+            let custRecord = customerMap[b.phone];
+            let reviewDone = custRecord ? custRecord.google_review_given : false;
+            let reviewStatusHtml = reviewDone ? '<br><span style="color: #16a34a; font-weight: bold; font-size: 10px;">⭐ Review Done</span>' : '<br><span style="color: #dc2626; font-size: 10px;">Review Pending</span>';
+
             if (b.status === 'Pending') {
                 pendingCount++;
                 pendingHtml += `<tr>
-                    <td>${b.name}<br><small>${b.phone}</small></td>
+                    <td><b>${b.name}</b><br><small>${b.phone}</small>${reviewStatusHtml}</td>
                     <td>₹${b.amount}</td>
                     <td><b>+${b.points}</b></td>
                     <td>
@@ -338,7 +395,7 @@
                 </tr>`;
             } else {
                 historyHtml += `<tr>
-                    <td>${b.name}<br><small>${b.phone}</small></td>
+                    <td><b>${b.name}</b><br><small>${b.phone}</small>${reviewStatusHtml}</td>
                     <td>₹${b.amount}</td>
                     <td><b>+${b.points}</b></td>
                     <td><span style="color:green">Approved</span></td>
