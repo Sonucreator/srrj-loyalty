@@ -233,7 +233,7 @@
     </div>
 </div>
 
-<!-- CUSTOM INPUT MODAL (REPLACES BROWSER PROMPT WITH OK BUTTON) -->
+<!-- CUSTOM INPUT MODAL (OK ✅ BUTTON) -->
 <div id="customInputModal">
     <div class="modal-card">
         <h4 id="ciTitle" style="margin-top:0; color:var(--primary-dark);">Security Verification</h4>
@@ -333,7 +333,6 @@
         resetInactivityTimer();
     };
 
-    // Helper for Custom Prompt Modal with OK ✅ Button
     function showCustomInput(title, fieldsConfig) {
         return new Promise((resolve) => {
             const modal = document.getElementById('customInputModal');
@@ -493,7 +492,6 @@
         `;
     };
 
-    // CUSTOMER LOGIN WITH MODAL & OK BUTTON
     window.srrjCustomerLogin = async function() {
         const phoneInput = document.getElementById('custLoginPhone');
         if(!phoneInput) return;
@@ -504,7 +502,6 @@
         if (error) { alert('Database error: ' + error.message); return; }
 
         if (!data || data.length === 0) {
-            // New Customer Registration Modal
             let regData = await showCustomInput("New Customer Registration", [
                 { label: "Full Name", name: "name", placeholder: "Enter your full name" },
                 { label: "Referral Mobile (Optional)", name: "referrer", placeholder: "Referrer mobile number" },
@@ -524,17 +521,18 @@
                 phone, name, points: 0, google_review_given: false, referred_by: referrer, pin: newPin 
             }]).select();
 
-            if (insertError || !newData || newData.length === 0) { alert('Error registering user.'); return; }
+            if (insertError) { alert('Error registering user: ' + insertError.message); return; }
+            if (!newData || newData.length === 0) { alert('Error registering user.'); return; }
             activeCustomer = newData[0];
         } else {
-            // Existing Customer - Verify Secret PIN Modal
             let cust = data[0];
-            if (cust.pin) {
+            
+            if (cust.pin !== undefined && cust.pin !== null && cust.pin.toString().trim() !== "") {
                 let pinData = await showCustomInput("Enter Secret PIN", [
                     { label: "4-Digit Secret PIN", name: "pin", type: "password", placeholder: "Enter PIN", maxlength: 4 }
                 ]);
 
-                if (pinData.pin !== cust.pin) {
+                if (pinData.pin !== cust.pin.toString()) {
                     alert('⚠️ Incorrect PIN! Access denied.');
                     return;
                 }
@@ -544,7 +542,12 @@
                 ]);
                 let setPin = setPinData.pin;
                 if (!setPin || setPin.length < 4) { alert('PIN is required.'); return; }
-                await dbClient.from('customers').update({ pin: setPin }).eq('phone', phone);
+                
+                let { error: updateErr } = await dbClient.from('customers').update({ pin: setPin }).eq('phone', phone);
+                if (updateErr) {
+                    alert('Error saving PIN to database: ' + updateErr.message);
+                    return;
+                }
                 cust.pin = setPin;
             }
             activeCustomer = cust;
@@ -816,18 +819,25 @@
             return;
         }
         
-        await dbClient.from('customers').insert([{ phone: regData.phone, name: regData.name, points: 0, google_review_given: false, pin: regData.pin }]);
+        let { error } = await dbClient.from('customers').insert([{ phone: regData.phone, name: regData.name, points: 0, google_review_given: false, pin: regData.pin }]);
+        if (error) {
+            alert('Error adding customer: ' + error.message);
+            return;
+        }
         loadAdminDashboard();
         alert('Customer added successfully!');
     };
 
     window.srrjEditPoints = async function(phone, currentPoints) {
-        const type = prompt("Type 'add' to add points or 'reduce' to deduct:", "add");
-        if (!type) return;
-        const val = parseInt(prompt("Enter points:", "50"));
-        if (isNaN(val)) return;
+        let editData = await showCustomInput("Edit Customer Points", [
+            { label: "Type 'add' or 'reduce'", name: "type", val: "add" },
+            { label: "Enter Points Value", name: "val", type: "number", val: "50" }
+        ]);
+        if (!editData || !editData.type || !editData.val) return;
+        const pts = parseInt(editData.val);
+        if (isNaN(pts)) return;
 
-        let newPoints = type.toLowerCase() === 'add' ? currentPoints + val : Math.max(0, currentPoints - val);
+        let newPoints = editData.type.toLowerCase() === 'add' ? currentPoints + pts : Math.max(0, currentPoints - pts);
         await dbClient.from('customers').update({ points: newPoints }).eq('phone', phone);
         loadAdminDashboard();
         alert('Updated successfully!');
@@ -838,7 +848,11 @@
         if (!custArr || custArr.length === 0) { alert('Customer not found!'); return; }
         let cust = custArr[0];
 
-        const rupee = parseFloat(prompt(`Available: ${cust.points} pts (₹${cust.points}).\nEnter rupee value to redeem:`, "10"));
+        let redeemData = await showCustomInput("Redeem Points", [
+            { label: `Available: ${cust.points} pts. Enter Rupee Value:`, name: "rupee", type: "number", val: "10" }
+        ]);
+        if (!redeemData || !redeemData.rupee) return;
+        const rupee = parseFloat(redeemData.rupee);
         if (isNaN(rupee) || rupee <= 0) return;
         const ptsToDeduct = Math.round(rupee);
         if (ptsToDeduct > cust.points) { alert('Not enough points!'); return; }
